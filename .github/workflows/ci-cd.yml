@@ -1,0 +1,48 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # リポジトリのクローン
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Docker Compose をインストール
+      - name: Set up Docker Compose
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      # Docker イメージのビルド
+      - name: Build Docker Images
+        run: docker-compose build
+
+      # コンテナを起動してテストを実行
+      - name: Run Tests
+        run: |
+          docker-compose up -d
+          docker exec flask_app pytest  # pytest を使ったテスト実行を想定
+          docker-compose down
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'  # main ブランチのみデプロイ
+
+    steps:
+      - name: Deploy to Server
+        run: |
+          ssh -i ${{ secrets.SSH_KEY }} user@your-server-ip <<EOF
+            cd /path/to/project
+            git pull origin main
+            docker-compose down
+            docker-compose up --build -d
+          EOF
